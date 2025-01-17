@@ -22,23 +22,22 @@ client.once(Events.ClientReady, (clientUser) => {
 
 client.login(process.env.BOT_TOKEN)
 
-const BOT_CHANNEL = "1067560640526438510"
-const PAST_MESSAGES = 5
-
 client.on(Events.MessageCreate, async (message) => {
     if (message.author.bot) return
-    if (message.channel.id !== BOT_CHANNEL) return
 
+    console.log(message.content)
     message.channel.sendTyping()
 
+    if (!process.env.BOT_CHANNEL_ANY && message.channel.id !== process.env.BOT_CHANNEL) return
+
     let messages = Array.from(await message.channel.messages.fetch({
-        limit: PAST_MESSAGES,
+        limit: process.env.PAST_MESSAGES,
         before: message.id
     }))
     messages = messages.map(m=>m[1])
     messages.unshift(message)
 
-    let users = [...new Set([...messages.map(m=> m.member.displayName), client.user.username])]
+    let users = [...new Set([...messages.filter(m => m.member && m.member.displayName).map(m => m.member.displayName), client.user.username])]
 
     let lastUser = users.pop()
 
@@ -46,15 +45,21 @@ client.on(Events.MessageCreate, async (message) => {
 
     for (let i = messages.length - 1; i >= 0; i--) {
         const m = messages[i]
-        prompt += `${m.member.displayName}: ${m.content}\n`
+        if (m.member && m.member.displayName) prompt += `${m.member.displayName}: ${m.content}\n`
     }
+
     prompt += `${client.user.username}:`
     console.log("prompt:", prompt)
 
+    const BOT_ID = process.env.BOT_ID
+    let flag = message.content.includes(BOT_ID)
+    console.log("bot_id.flag",BOT_ID,flag)
+    if (!flag) return
+
     const response = await openai.createCompletion({
         prompt,
-        model: "text-davinci-003",
-        max_tokens: 500,
+        model: process.env.OPENAI_MODEL,
+        max_tokens: Number(process.env.MAX_TOKENS),
         stop: ["\n"]
     })
 
